@@ -245,6 +245,9 @@ public class DubboProtocol extends AbstractProtocol {
         return DEFAULT_PORT;
     }
 
+    // 1、 从invoker的url中获取将要暴露的远程服务的key：com.alibaba.dubbo.demo.DemoService:20880（实际上是：serviceGroup/serviceName:serviceVersion:port  例：cpu-demo-showlc/com.demo.IDemoService:20880）
+    //     注意：本地暴露的key就是：com.alibaba.dubbo.demo.DemoService
+    // 2 打开ExchangeServer
     @Override
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
         URL url = invoker.getUrl();

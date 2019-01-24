@@ -179,6 +179,7 @@ public class RegistryProtocol implements Protocol {
 
         providerUrl = overrideUrlWithConfig(providerUrl, overrideSubscribeListener);
         //export invoker
+        // 将invoker转换为exporter并启动netty服务
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker, providerUrl);
 
         // url to registry
@@ -209,16 +210,30 @@ public class RegistryProtocol implements Protocol {
         return serviceConfigurationListener.overrideUrl(providerUrl);
     }
 
+    // 1、从invoker的URL中的Map<String, String> parameters中获取key为export的地址providerUrl，该地址将是服务注册在zk上的节点
+    // 2、从 Map<String, ExporterChangeableWrapper<?>> bounds 缓存中获取key为上述providerUrl的exporter，如果有，直接返回，如果没有，创建并返回
     @SuppressWarnings("unchecked")
     private <T> ExporterChangeableWrapper<T> doLocalExport(final Invoker<T> originInvoker, URL providerUrl) {
+        // 根据originInvoker获取providerUrl
         String key = getCacheKey(originInvoker);
         ExporterChangeableWrapper<T> exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
         if (exporter == null) {
             synchronized (bounds) {
                 exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
                 if (exporter == null) {
-
+                    // 创建InvokerDelegete, InvokerDelegete是RegistryProtocol的一个静态内部类，该类是一个originInvoker的委托类，该类存储了originInvoker，其父类InvokerWrapper还会存储providerUrl，InvokerWrapper会调用originInvoker的invoke方法，也会销毁invoker。可以管理invoker的生命周期。
+                    // InvokerDelegete对象s属性：
+                    //  invoker：originInvoker（AbstractProxyInvoker对象）
+                    //  InvokerWrapper.invoker：originInvoker（AbstractProxyInvoker对象）
+                    //  url：providerUrl（dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=1035&side=provider&timestamp=1507101286063）
                     final Invoker<?> invokerDelegete = new InvokerDelegate<T>(originInvoker, providerUrl);
+                    // 使用DubboProtocol将InvokerDelegete转换为Exporter
+                    // 1)、com.alibaba.dubbo.rpc.protocol.ProtocolListenerWrapper#export
+                    // 2)、com.alibaba.dubbo.rpc.protocol.ProtocolFilterWrapper#export
+                    // 3)、com.alibaba.dubbo.rpc.protocol.ProtocolFilterWrapper#buildInvokerChain
+                    //      首先对InvokerDelegete对象进行8个filter的递归包装，之后使用DubboProtocol对包装后的InvokerDelegete对象进行export
+                    // 4)、com.alibaba.dubbo.rpc.protocol.dubbo.DubboProtocol#export
+
                     exporter = new ExporterChangeableWrapper<T>((Exporter<T>) protocol.export(invokerDelegete), originInvoker);
                     bounds.put(key, exporter);
                 }
@@ -330,11 +345,13 @@ public class RegistryProtocol implements Protocol {
 
     /**
      * Get the key cached in bounds by invoker
+     * 获取invoker在bounds中缓存的key
      *
      * @param originInvoker
      * @return
      */
     private String getCacheKey(final Invoker<?> originInvoker) {
+        // originInvoker就是上述创建出来的AbstractProxyInvoker实例，注意他的url是registry协议的，该url的export参数的value就是我们要获取的providerUrl。
         URL providerUrl = getProviderUrl(originInvoker);
         String key = providerUrl.removeParameters("dynamic", "enabled").toFullString();
         return key;

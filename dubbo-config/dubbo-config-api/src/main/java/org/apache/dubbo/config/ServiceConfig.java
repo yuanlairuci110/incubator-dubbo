@@ -40,6 +40,8 @@ import org.apache.dubbo.rpc.ProxyFactory;
 import org.apache.dubbo.rpc.cluster.ConfiguratorFactory;
 import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.apache.dubbo.rpc.model.ProviderModel;
+import org.apache.dubbo.rpc.proxy.javassist.JavassistProxyFactory;
+import org.apache.dubbo.rpc.proxy.wrapper.StubProxyFactoryWrapper;
 import org.apache.dubbo.rpc.service.GenericService;
 import org.apache.dubbo.rpc.support.ProtocolUtils;
 
@@ -556,10 +558,20 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
                         // 通过proxyFactory将url, 接口类型转化成invoker
                         // 首先将实现类ref封装为Invoker，之后将invoker转换为exporter，最后将exporter放入缓存List<Exporter> exporters中。
+                        // 1、为registryURL拼接export=providerUrl参数 registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString())
+                        // 2、ProxyFactory$Adaptive.getInvoker(DemoServiceImpl实例, Class<DemoService>, registryURL)
+                        //         StubProxyFactoryWrapper.getInvoker ---> JavassistProxyFactory.getInvoker()
+                        //
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+                        // ref实现类转换成了Invoker
+                        // 调用该invoker.invoke(Invocation invocation)的时候，会调用invoker.doInvoke(T proxy, String methodName,Class<?>[] parameterTypes, Object[] arguments)的时候，就会调用相应的实现类proxy的wrapper类的invokeMethod(proxy, methodName, parameterTypes, arguments)，该方法又会调用真实的实现类methodName方法
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
-                        // 通过protocol将invoker暴露出去
-                        // 这里protocol 根据url中的registry协议, 尝试去获取RegistryProtocol
+                        // 通过protocol将invoker暴露出去，这里protocol 根据url中的registry协议, 尝试去获取RegistryProtocol
+                        // 将Invoker转换为Exporter
+                        //  1)、由于aop的原因，首先调用了org.apache.dubbo.rpc.protocol.ProtocolListenerWrapper.export(Invoker<T> invoker)
+                        //  2)、由于协议是“registry”，所以不做任何处理，继续调用com.alibaba.dubbo.rpc.protocol.ProtocolFilterWrapper#export(Invoker<T> invoker)
+                        //  3)、同理，由于协议是“registry”，所以不做任何处理，继续调用com.alibaba.dubbo.registry.integration.RegistryProtocol#export(final Invoker<T> originInvoker)
+                        //         包括 将invoker转换为exporter、启动netty、注册服务到zookeeper、订阅、返回新的exporter实例
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         exporters.add(exporter);
                     }
@@ -684,6 +696,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     // 从protocolConfig上取端口, 取不到从provider上取, 仍然取不到的话, 从dubboProtocol上获取默认端口(20880),如果端口小于0 赋值默认端口
     // 如果配置了协议但是XxxProtocol上没有默认端口, 那就随机生成一个端口.通过NetUtils.getAvailablePort(defaultPort)取得.
+
     /**
      * Register port and bind port for the provider, can be configured separately
      * Configuration priority: environment variable -> java system properties -> port property in protocol config file
@@ -804,7 +817,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (provider != null) {
             return;
         }
-        setProvider (
+        setProvider(
                 ConfigManager.getInstance()
                         .getDefaultProvider()
                         .orElseGet(() -> {
@@ -835,15 +848,15 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
         if (StringUtils.isEmpty(protocolIds)) {
             if (CollectionUtils.isEmpty(protocols)) {
-               setProtocols(
-                       ConfigManager.getInstance().getDefaultProtocols()
-                        .filter(CollectionUtils::isNotEmpty)
-                        .orElseGet(() -> {
-                            ProtocolConfig protocolConfig = new ProtocolConfig();
-                            protocolConfig.refresh();
-                            return Arrays.asList(protocolConfig);
-                        })
-               );
+                setProtocols(
+                        ConfigManager.getInstance().getDefaultProtocols()
+                                .filter(CollectionUtils::isNotEmpty)
+                                .orElseGet(() -> {
+                                    ProtocolConfig protocolConfig = new ProtocolConfig();
+                                    protocolConfig.refresh();
+                                    return Arrays.asList(protocolConfig);
+                                })
+                );
             }
         } else {
             String[] arr = Constants.COMMA_SPLIT_PATTERN.split(protocolIds);

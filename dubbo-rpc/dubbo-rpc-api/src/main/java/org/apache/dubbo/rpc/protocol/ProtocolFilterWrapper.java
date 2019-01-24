@@ -44,6 +44,8 @@ public class ProtocolFilterWrapper implements Protocol {
         this.protocol = protocol;
     }
 
+    // 1、根据key从url中获取相应的filter的values，再根据这个values和group去获取类上带有@Active注解的filter集合
+    // 2、之后将这些filter对传入的invoker进行递归包装层invoker（就是一个链表）
     private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
         Invoker<T> last = invoker;
         List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);

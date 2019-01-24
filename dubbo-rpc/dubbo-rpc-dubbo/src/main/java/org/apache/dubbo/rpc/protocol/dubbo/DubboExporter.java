@@ -27,8 +27,10 @@ import java.util.Map;
  */
 public class DubboExporter<T> extends AbstractExporter<T> {
 
+    // serviceGroup/serviceName:serviceVersion:port, 例如：com.alibaba.dubbo.demo.DemoService:20880
     private final String key;
 
+    // { "com.alibaba.dubbo.demo.DemoService:20880" -> 当前的DubboExporter实例 }
     private final Map<String, Exporter<?>> exporterMap;
 
     public DubboExporter(Invoker<T> invoker, String key, Map<String, Exporter<?>> exporterMap) {
