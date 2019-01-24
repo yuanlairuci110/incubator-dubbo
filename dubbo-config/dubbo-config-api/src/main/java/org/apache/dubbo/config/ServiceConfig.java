@@ -361,6 +361,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
         ProviderModel providerModel = new ProviderModel(getUniqueServiceName(), ref, interfaceClass);
         ApplicationModel.initProviderModel(getUniqueServiceName(), providerModel);
+        // 服务发布
         doExportUrls();
     }
 
@@ -405,6 +406,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
+        // 方法一 开始先从protocolConfig上取协议名称, 如果取不到仍然默认协议为"dubbo"
         String name = protocolConfig.getName();
         if (StringUtils.isEmpty(name)) {
             name = Constants.DUBBO;
@@ -508,7 +510,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             contextPath = provider.getContextpath();
         }
 
+        // 从protocolConfig上取host, 取不到, 从provider上取host. (对应dubbo:protocol的host属性, 官方手册解释为服务主机名，多网卡选择或指定VIP及域名时使用，为空则自动查找本机IP，-建议不要配置，让Dubbo自动获取本机IP)
         String host = this.findConfigedHosts(protocolConfig, registryURLs, map);
+        // 得到端口
         Integer port = this.findConfigedPorts(protocolConfig, name, map);
         URL url = new URL(name, host, port, (StringUtils.isEmpty(contextPath) ? "" : contextPath + "/") + path, map);
 
@@ -518,11 +522,13 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                     .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
         }
 
+        // 从url中获取scope信息, 如果scope=none 啥都不做, 不暴露服务.
         String scope = url.getParameter(Constants.SCOPE_KEY);
         // don't export when none is configured
         if (!Constants.SCOPE_NONE.equalsIgnoreCase(scope)) {
 
             // export to local if the config is not remote (export to remote only when config is remote)
+            // 配置不是remote的情况下做本地暴露 (配置为remote，则表示只暴露远程服务)
             if (!Constants.SCOPE_REMOTE.equalsIgnoreCase(scope)) {
                 exportLocal(url);
             }
@@ -548,9 +554,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                             registryURL = registryURL.addParameter(Constants.PROXY_KEY, proxy);
                         }
 
+                        // 通过proxyFactory将url, 接口类型转化成invoker
+                        // 首先将实现类ref封装为Invoker，之后将invoker转换为exporter，最后将exporter放入缓存List<Exporter> exporters中。
                         Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
                         DelegateProviderMetaDataInvoker wrapperInvoker = new DelegateProviderMetaDataInvoker(invoker, this);
-
+                        // 通过protocol将invoker暴露出去
+                        // 这里protocol 根据url中的registry协议, 尝试去获取RegistryProtocol
                         Exporter<?> exporter = protocol.export(wrapperInvoker);
                         exporters.add(exporter);
                     }
@@ -611,6 +620,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
 
         // if bind ip is not found in environment, keep looking up
+        // 如果仍然是无效的或者是本地地址,  遍历注册中心的url, 发起socket连接, 然后通过socket.getLocalAddress().getHostAddress()得到主机地址
         if (StringUtils.isEmpty(hostToBind)) {
             hostToBind = protocolConfig.getHost();
             if (provider != null && StringUtils.isEmpty(hostToBind)) {
@@ -648,6 +658,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                             }
                         }
                     }
+                    // 还是得不到无效的或者是本地地址的话, 通过NetUtils.getLocalHost()得到主机ip, 这个方法通过遍历本地网卡，返回第一个合理的IP
                     if (isInvalidLocalHost(hostToBind)) {
                         hostToBind = getLocalHost();
                     }
@@ -671,6 +682,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return hostToRegistry;
     }
 
+    // 从protocolConfig上取端口, 取不到从provider上取, 仍然取不到的话, 从dubboProtocol上获取默认端口(20880),如果端口小于0 赋值默认端口
+    // 如果配置了协议但是XxxProtocol上没有默认端口, 那就随机生成一个端口.通过NetUtils.getAvailablePort(defaultPort)取得.
     /**
      * Register port and bind port for the provider, can be configured separately
      * Configuration priority: environment variable -> java system properties -> port property in protocol config file

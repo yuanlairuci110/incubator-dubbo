@@ -115,6 +115,11 @@ public class NetUtils {
         return Constants.ANYHOST_VALUE.equals(host);
     }
 
+    /**
+     * 如果host是无效的本地地址(isInvalidLocalHost)
+     * @param host
+     * @return
+     */
     public static boolean isInvalidLocalHost(String host) {
         return host == null
                 || host.length() == 0
@@ -190,6 +195,10 @@ public class NetUtils {
         return address;
     }
 
+    /**
+     * 获取本地host
+     * @return
+     */
     public static String getLocalHost() {
         InetAddress address = getLocalAddress();
         return address == null ? Constants.LOCALHOST_VALUE : address.getHostAddress();
