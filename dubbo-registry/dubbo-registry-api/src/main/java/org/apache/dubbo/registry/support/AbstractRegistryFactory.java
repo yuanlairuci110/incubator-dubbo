@@ -80,6 +80,20 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
         }
     }
 
+    /**
+     *  流程：
+     *  1、先处理url ：
+     *      (1)、设置：path=com.alibaba.dubbo.registry.RegistryService
+     *      （2）、添加参数：interface=com.alibaba.dubbo.registry.RegistryService
+     *      （3）、去除export参数
+     *       url: zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&client=curator&dubbo=2.0.0&interface=com.alibaba.dubbo.registry.RegistryService&pid=2791&timestamp=1507262031521
+     *  2、获取Registry的key
+     *      key形式：protocol://username:password@host:port/group/interface{path}:version?key1=value1&key2=value2...。
+     *      key=zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService
+     *  3、根据该key从Map<String, Registry> REGISTRIES注册中心集合缓存中获取Registry
+     *          如果有，直接返回，
+     *          如果没有，创建Registry，之后存入缓存，最后返回。
+     */
     @Override
     public Registry getRegistry(URL url) {
         url = url.setPath(RegistryService.class.getName())
@@ -87,6 +101,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
                 .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);
         String key = url.toServiceStringWithoutResolving();
         // Lock the registry access process to ensure a single instance of the registry
+        // 锁定注册中心获取过程，保证注册中心单一实例
         LOCK.lock();
         try {
             Registry registry = REGISTRIES.get(key);
@@ -94,6 +109,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
                 return registry;
             }
             //create registry by spi/ioc
+            // org.apache.dubbo.registry.zookeeper.ZookeeperRegistryFactory.createRegistry
             registry = createRegistry(url);
             if (registry == null) {
                 throw new IllegalStateException("Can not create registry " + url);

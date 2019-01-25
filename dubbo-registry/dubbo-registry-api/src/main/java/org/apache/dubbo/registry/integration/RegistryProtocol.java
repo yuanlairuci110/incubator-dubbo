@@ -153,6 +153,7 @@ public class RegistryProtocol implements Protocol {
         return overrideListeners;
     }
 
+    // registry是ZookeeperRegistry。register(registedProviderUrl)方法在ZookeeperRegistry的父类FailbackRegistry中实现。
     public void register(URL registryUrl, URL registeredProviderUrl) {
         Registry registry = registryFactory.getRegistry(registryUrl);
         registry.register(registeredProviderUrl);
@@ -183,13 +184,16 @@ public class RegistryProtocol implements Protocol {
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker, providerUrl);
 
         // url to registry
+        // 服务注册到zookeeper
         final Registry registry = getRegistry(originInvoker);
+        // 获取真正要注册到zk的节点url
         final URL registeredProviderUrl = getRegisteredProviderUrl(providerUrl, registryUrl);
         ProviderInvokerWrapper<T> providerInvokerWrapper = ProviderConsumerRegTable.registerProvider(originInvoker,
                 registryUrl, registeredProviderUrl);
         //to judge if we need to delay publish
         boolean register = registeredProviderUrl.getParameter("register", true);
         if (register) {
+            // 注册服务到zk
             register(registryUrl, registeredProviderUrl);
             providerInvokerWrapper.setReg(true);
         }
@@ -285,6 +289,9 @@ public class RegistryProtocol implements Protocol {
 
     /**
      * Get an instance of registry based on the address of invoker
+     * 创建ZookeeperRegistry实例
+     *
+     * org.apache.dubbo.registry.support.AbstractRegistryFactory#getRegistry(org.apache.dubbo.common.URL)
      *
      * @param originInvoker
      * @return
@@ -294,6 +301,9 @@ public class RegistryProtocol implements Protocol {
         return registryFactory.getRegistry(registryUrl);
     }
 
+    /**
+     * 根据invoker的地址获取registry实例
+     */
     private URL getRegistryUrl(Invoker<?> originInvoker) {
         URL registryUrl = originInvoker.getUrl();
         if (REGISTRY_PROTOCOL.equals(registryUrl.getProtocol())) {
@@ -306,7 +316,9 @@ public class RegistryProtocol implements Protocol {
 
     /**
      * Return the url that is registered to the registry and filter the url parameter once
-     *
+     *  去除providerUrl中所有参数名是"."开头的，然后去除参数monitor
+     *  最后得到的registedProviderUrl是：
+     *  dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=4758&side=provider&timestamp=1507289961588
      * @param providerUrl
      * @return url to registry.
      */

@@ -39,7 +39,6 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * ZookeeperRegistry
- *
  */
 public class ZookeeperRegistry extends FailbackRegistry {
 
@@ -57,6 +56,41 @@ public class ZookeeperRegistry extends FailbackRegistry {
 
     private final ZookeeperClient zkClient;
 
+    /**
+     * AbstractRegistry ：主要用来维护缓存文件。
+     *      1、设置属性registryUrl=url：zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&client=curator&dubbo=2.0.0&interface=com.alibaba.dubbo.registry.RegistryService&pid=4685&timestamp=1507286468150
+     *      2、创建文件/Users/lc/.dubbo/dubbo-registry-10.211.55.5.cache的文件夹/Users/jigangzhao/.dubbo
+     *      3、设置属性file：/Users/lc/.dubbo/dubbo-registry-10.211.55.5.cache文件，该文件存储信息将是这样的：
+     *      com.alibaba.dubbo.demo.DemoService=empty\://10.10.10.10\:20880/com.alibaba.dubbo.demo.DemoService?anyhost\=true&application\=demo-provider&category\=configurators&check\=false&dubbo\=2.0.0&generic\=false&interface\=com.alibaba.dubbo.demo.DemoService&methods\=sayHello&pid\=5259&side\=provider&timestamp\=1507294508053
+     *      4、如果file存在，将file中的内容写入properties属性；既然有读file，那么是什么时候写入file的呢？AbstractRegistry创建了一个含有一个名字为DubboSaveRegistryCache的后台线程的FixedThreadPool，只在在notify(URL url, NotifyListener listener, List<URL> urls)方法中会被调用，我们此处由于ConcurrentMap<URL, Set<NotifyListener>> subscribed为空，所以AbstractRegistry(URL url)中的notify(url.getBackupUrls())不会执行，此处也不会创建文件。
+     *      5、最后是notify(url.getBackupUrls())（这里后续会写）
+     * FailbackRegistry ：主要用来做失败重试操作（包括：注册失败／反注册失败／订阅失败／反订阅失败／通知失败的重试）；也提供了供ZookeeperRegistry使用的zk重连后的恢复工作的方法。
+     *      启动了一个含有一个名为DubboRegistryFailedRetryTimer的后台线程的ScheduledThreadPool，线程创建5s后开始第一次执行retry()，之后每隔5s执行一次
+     * ZookeeperRegistry ：创建zk客户端，启动会话；并且调用FailbackRegistry实现zk重连后的恢复工作。
+     *      1、属性设置root=/dubbo
+     *      2、创建zk客户端，启动会话
+     *          org.apache.dubbo.remoting.zookeeper.support.AbstractZookeeperTransporter#connect(org.apache.dubbo.common.URL)创建CuratorZookeeperClient
+     *          ZookeeperRegistry实例属性：
+     *              ZookeeperClient zkClient = CuratorZookeeperClient实例
+     *                  CuratorFramework client：CuratorFrameworkImpl实例
+     *                  String url：zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&client=curator&dubbo=2.0.0&interface=com.alibaba.dubbo.registry.RegistryService&pid=4685&timestamp=1507286468150
+     *                  Set<StateListener> stateListeners：{ 监听了重连成功事件的执行recover()的StateListener }
+     *              String root="/dubbo"
+     *              URL registryUrl = zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&client=curator&dubbo=2.0.0&interface=com.alibaba.dubbo.registry.RegistryService&pid=4685&timestamp=1507286468150
+     *              Set<URL> registered：0//已经注册的url集合，此处为空
+     *              ConcurrentMap<URL, Set<NotifyListener>> subscribed：0//已经订阅的<URL, Set<NotifyListener>>
+     *              ConcurrentMap<URL, Map<String, List<URL>>> notified：0//已经通知的<URL, Map<String, List<URL>>>
+     *              Set<URL> failedRegistered：0//注册失败的url
+     *              Set<URL> failedUnregistered：0//反注册失败的url
+     *              ConcurrentMap<URL, Set<NotifyListener>> failedSubscribed：0//订阅失败的url
+     *              ConcurrentMap<URL, Set<NotifyListener>> failedUnsubscribed：0//反订阅失败的url
+     *              ConcurrentMap<URL, Map<NotifyListener, List<URL>>> failedNotified：0//通知失败的url
+     *              ConcurrentMap<URL, ConcurrentMap<NotifyListener, ChildListener>> zkListeners：0
+     *      ZookeeperRegistry会存储在ZookeeperRegistry的父类的static属性Map<String, Registry> REGISTRIES中
+     *      Map<String, Registry> REGISTRIES：{ "zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService" : ZookeeperRegistry实例 }
+     *      3、创建了一个StateListener监听器，监听重新连接成功事件，重新连接成功后，之前已经完成注册和订阅的url要重新进行注册和订阅（因为临时节点可能已经跪了）。
+     *
+     */
     public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
         super(url);
         if (url.isAnyHost()) {
@@ -67,7 +101,9 @@ public class ZookeeperRegistry extends FailbackRegistry {
             group = Constants.PATH_SEPARATOR + group;
         }
         this.root = group;
+        // 创建zk客户端，启动会话
         zkClient = zookeeperTransporter.connect(url);
+        // 监听重新连接成功事件，重新连接成功后，之前已经完成注册和订阅的url要重新进行注册和订阅（因为临时节点可能已经跪了）
         zkClient.addStateListener(state -> {
             if (state == StateListener.RECONNECTED) {
                 try {
