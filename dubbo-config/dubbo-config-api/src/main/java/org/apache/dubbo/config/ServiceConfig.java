@@ -349,6 +349,15 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
     }
 
+    /**
+     * 暴露服务调用链：
+     * AbstractApplicationContext.refresh
+     * 	--> AbstractApplicationContext.finishRefresh
+     * 		--> AbstractApplicationContext.publishEvent
+     * 			 --> SimpleApplicationEventMulticaster.multicastEvent
+     * 			       --> ServiceBean.onApplicationEvent
+     * 						--> ServiceConfig.export  --> doExport  --> doExportUrls
+     */
     protected synchronized void doExport() {
         if (unexported) {
             throw new IllegalStateException("The service " + interfaceClass.getName() + " has already unexported!");
