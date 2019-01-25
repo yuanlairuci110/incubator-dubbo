@@ -595,6 +595,58 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         this.urls.add(url);
     }
 
+    /**
+     * 本地暴露过程：
+     * 通过JavassistProxyFactory（默认）将具体的实现类包装成AbstractProxyInvoker实例
+     * InjvmProtocol将上述的AbstractProxyInvoker实例转换成Exporter
+     *
+     * 本地暴露调用链：
+     * ServiceBean.onApplicationEvent(ApplicationEvent event)
+     * -->ServiceConfig.export()
+     *    -->doExport()
+     *       -->doExportUrls()
+     *          -->loadRegistries(boolean provider) //
+     *          -->doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs)
+     *             -->Wrapper getWrapper(Class<?> c)
+     *                -->makeWrapper(Class<?> c)
+     *             -->new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map)
+     *
+     *             --   本地暴露   --
+     *             -->exportLocal(url)
+     *                -->构造injvm协议的url:injvmUrl
+     *                --  1 将ref包装成Invoker   --
+     *                -->ProxyFactory$Adaptive.getInvoker(ref实例, interfaceClass, injvmUrl)
+     *                   -->ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.ProxyFactory.class).getExtension("javassist")
+     *                   -->StubProxyFactoryWrapper.getInvoker(T proxy, Class<T> type, URL url)
+     *                      -->JavassistProxyFactory.getInvoker(T proxy, Class<T> type, URL url)
+     *                         -->Wrapper getWrapper(Class<?> c)
+     *                            -->makeWrapper(Class<?> c)
+     *                         -->new AbstractProxyInvoker<T>(ref实例, interfaceClass, injvmUrl)
+     *                --  2 将Invoker暴露为Exporter
+     *                -->Protocol$Adaptive.export(Invoker<T> invoker)
+     *                   -->ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.Protocol.class).getExtension("injvm")
+     *                   -->ProtocolListenerWrapper.export(Invoker<T> invoker)
+     *                      -->ProtocolFilterWrapper.export(Invoker<T> invoker)
+     *                         -->buildInvokerChain(final Invoker<T> invoker, key:"service.filter", group:"provider")
+     *                            -->ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(injvmUrl, "service.filter", "provider")
+     *                         -->InjvmProtocol.export(Invoker<T> invoker)
+     *                            -->new InjvmExporter(Invoker<T> invoker, key:"com.alibaba.dubbo.demo.DemoService", Map<String, Exporter<?>> exporterMap)
+     *                               -->InjvmExporter.exporterMap({"com.alibaba.dubbo.demo.DemoService" -> "injvm://127.0.0.1/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3207&side=provider&timestamp=1507009133930"})
+     *                   -->new ListenerExporterWrapper(Exporter<T> exporter, List<ExporterListener> listeners) ： 使用listener包装invoker
+     *                --  3 将Invoker暴露为Exporter   --
+     *                -->ServiceConfig#exporters.add(exporter)
+     *
+     *  List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group)：根据key从url中获取相应的filter的values，再根据这个values和group去获取类上带有@Active注解的filter集合。这一块儿具体的代码可以查看讲解spi中的loadFile方法。最终会获取到8个filter
+     *
+     *  最终的InjvmExporter实例：
+     *       key = "com.alibaba.dubbo.demo.DemoService"
+     *       exporterMap: { "com.alibaba.dubbo.demo.DemoService" -> 当前的InjvmExporter实例 }
+     *       Invoker<T> invoker = 被filter进行递归包裹后的Invoker
+     *
+     *  为什么要有本地暴露：
+     *  同一个jvm中的服务，相互调用不需要通过远程注册中心，但是又想使用filter链，可以使用本地暴露。本地调用使用了 injvm 协议，是一个伪协议，它不开启端口，不发起远程调用，只在 JVM 内直接关联，但执行 Dubbo 的 Filter 链。
+     *
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void exportLocal(URL url) {
         if (!Constants.LOCAL_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
