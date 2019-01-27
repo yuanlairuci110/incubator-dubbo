@@ -114,6 +114,23 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
     }
 
+    /**
+     * 调用链：
+     * AbstractApplicationContext.refresh -->
+     * AbstractApplicationContext.finishBeanFactoryInitialization -->
+     * DefaultListableBeanFactory.preInstantiateSingletons -->
+     * AbstractBeanFactory.getBean -->
+     * AbstractBeanFactory.doGetBean -->
+     * DefaultSingletonBeanRegistry.getSingleton -->
+     * AbstractBeanFactory$1.getObject -->
+     * AbstractAutowireCapableBeanFactory.createBean -->
+     * AbstractAutowireCapableBeanFactory.doCreateBean -->
+     * AbstractAutowireCapableBeanFactory.initializeBean -->
+     * AbstractAutowireCapableBeanFactory.invokeInitMethods -->
+     * ServiceBean.afterPropertiesSet -->
+     *
+     * 默认不执行export();
+     */
     @Override
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {

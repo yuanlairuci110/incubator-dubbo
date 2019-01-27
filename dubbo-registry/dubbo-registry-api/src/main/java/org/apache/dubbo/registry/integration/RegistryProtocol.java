@@ -164,6 +164,22 @@ public class RegistryProtocol implements Protocol {
         registry.unregister(registeredProviderUrl);
     }
 
+    /**
+     * 调用链：
+     * AbstractApplicationContext.refresh
+     * --> AbstractApplicationContext.finishRefresh
+     * --> AbstractApplicationContext.publishEvent
+     * --> SimpleApplicationEventMulticaster.multicastEvent
+     * --> ServiceBean.onApplicationEvent
+     * --> ServiceConfig.export
+     * --> ServiceConfig.doExport
+     * --> ServiceConfig.doExportUrls
+     * --> ServiceConfig.doExportUrlsFor1Protocol
+     * --> Protocol$Adpative.export
+     * --> ProtocolFilterWrapper.export
+     * --> ProtocolListenerWrapper.export
+     * --> RegistryProtocol.export
+     */
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
         URL registryUrl = getRegistryUrl(originInvoker);
@@ -194,7 +210,7 @@ public class RegistryProtocol implements Protocol {
         boolean register = registeredProviderUrl.getParameter("register", true);
         if (register) {
             // 注册服务到zk
-            register(registryUrl, registeredProviderUrl);
+            register(registryUrl, registeredProviderUrl); //创建节点（即注册服务到zk上）
             providerInvokerWrapper.setReg(true);
         }
 
