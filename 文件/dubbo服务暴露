@@ -1,0 +1,130 @@
+最终的ServiceBean实例
+
+-->String id: "com.alibaba.dubbo.demo.DemoService"
+-->String beanName: "com.alibaba.dubbo.demo.DemoService"
+-->ApplicationContext applicationContext: ClassPathXmlApplicationContext实例
+-->supportedApplicationListener:true
+-->List<URL> urls: ["dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461"]
+-->List<Exporter<?>> exporters:[
+  -->InjvmExporter实例
+    -->String key:com.alibaba.dubbo.demo.DemoService
+    -->Map<String, Exporter<?>> exporterMap: {"com.alibaba.dubbo.demo.DemoService ", 当前的JvmExporter实例}
+    -->Invoker invoker：经过filter包装的AbstractProxyInvoker实例
+  -->RegistryProtocol返回的新的Exporter实例
+    -->Exporter exporter: ExporterChangeableWrapper<T> exporter实例
+      -->Invoker originInvoker：经过filter包装的AbstractProxyInvoker实例
+      -->Exporter exporter: DubboExporter
+    -->Registry registry: 上边的ZookeeperRegistry实例
+]
+-->String interfaceName:"com.alibaba.dubbo.demo.DemoService"
+-->Class<?> interfaceClass:interface com.alibaba.dubbo.demo.DemoService
+-->T ref: DemoServiceImpl实例
+-->String path:"com.alibaba.dubbo.demo.DemoService"
+-->List<ProtocolConfig> protocols:[解析：<dubbo:protocol name="dubbo" port="20880" id="dubbo" />]
+-->ApplicationConfig application:[解析：<dubbo:application name="demo-provider" id="demo-provider" />]
+-->List<RegistryConfig> registries:[解析：<dubbo:registry address="10.211.55.5:2181" protocol="zookeeper" id="com.alibaba.dubbo.config.RegistryConfig" />]
+
+代码调用链
+ServiceBean.onApplicationEvent(ApplicationEvent event)
+-->ServiceConfig.export()
+  -->doExport()
+    -->doExportUrls()
+      -->doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs)
+         protocolConfig：<dubbo:protocol name="dubbo" port="20880" id="dubbo" />
+         registryURLs：registry://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&client=curator&dubbo=2.0.0&pid=3141&registry=zookeeper&timestamp=1510021313960
+      	<!-- 一 本地暴露 -->
+        -->exportLocal(url)
+           url：dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3141&side=provider&timestamp=1510021401013
+          //1.1 将实现类ref封装成Invoker
+          -->JavassistProxyFactory.getInvoker(T proxy, Class<T> type, URL url)
+             proxy：DemoServiceImpl实例（即ref实例）
+             type：interface com.alibaba.dubbo.demo.DemoService
+             url：injvm://127.0.0.1/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3141&side=provider&timestamp=1510021401013
+            -->Wrapper.getWrapper(Class DemoServiceImpl)
+            -->new AbstractProxyInvoker<T>(proxy, type, url)
+          //1.2 将实现类Invoker暴露为Exporter
+          -->ProtocolFilterWrapper.buildInvokerChain(final Invoker<T> invoker, String key, String group)
+             组建invoker链，实际上只有最后一个是真正的AbstractProxyInvoker实例，前边的都是filter。
+             invoker:AbstractProxyInvoker实例
+             key：service.filter
+             group：provider
+          -->InjvmProtocol.export(Invoker<T> invoker)
+             invoker：经过filter包装的invoker
+            -->new InjvmExporter(Invoker<T> invoker, String key, Map<String, Exporter<?>> exporterMap)
+               invoker：经过filter包装的invoker
+               key:com.alibaba.dubbo.demo.DemoService
+               exporterMap:传入时为空，构造器执行后为{"com.alibaba.dubbo.demo.DemoService ", 当前的JvmExporter实例}
+          -->List<Exporter<?>> exporters.add(上述的exporter)
+        <!-- 二 远程暴露 -->
+        //2.1 将实现类ref封装成Invoker
+        -->JavassistProxyFactory.getInvoker(T proxy, Class<T> type, URL url)
+           proxy：DemoServiceImpl实例（即ref实例）
+           type：interface com.alibaba.dubbo.demo.DemoService
+           url：registry://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&client=curator&dubbo=2.0.0&export=dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3141&side=provider&timestamp=1510021401013&pid=3141&registry=zookeeper&timestamp=1510021313960
+          -->Wrapper.getWrapper(Class DemoServiceImpl)
+          -->new AbstractProxyInvoker<T>(proxy, type, url)
+        -->RegistryProtocol.export(final Invoker<T> originInvoker)
+           originInvoker：上述的AbstractProxyInvoker实例
+          //2.2 将invoker转化为exporter
+          -->doLocalExport(originInvoker)
+            -->new InvokerDelegete(Invoker<T> invoker, URL url)
+               invoker：原始的AbstractProxyInvoker实例
+               url：dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461
+            -->ProtocolFilterWrapper.buildInvokerChain(final Invoker<T> invoker, String key, String group)
+               组建invoker链，实际上只有最后一个是真正的InvokerDelegete实例，前边的都是filter
+               invoker:InvokerDelegete实例
+               key：service.filter
+               group：provider
+            -->DubboProtocol.export(Invoker<T> invoker)
+               invoker：经过filter包装的InvokerDelegete实例
+              -->new DubboExporter(Invoker<T> invoker, String key, Map<String, Exporter<?>> exporterMap)
+                 invoker：经过filter包装的InvokerDelegete实例
+                 key:com.alibaba.dubbo.demo.DemoService:20880 (group/servicename:version:port)
+                 exporterMap:传入时为空，构造器执行后又执行了put，为{"com.alibaba.dubbo.demo.DemoService:20880", 当前的DubboExporter实例}
+              //2.3 开启netty服务端监听客户端请求
+              -->openServer(URL url)
+                 url：dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461
+                -->createServer(URL url)
+                    -->HeaderExchanger.bind(URL url, ExchangeHandler handler)
+                       url：dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&channel.readonly.sent=true&codec=dubbo&dubbo=2.0.0&generic=false&heartbeat=60000&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461 handler:DubboProtocol.requestHandler
+                      -->new DecodeHandler(new HeaderExchangeHandler(handler)))
+                        -->NettyTransporter.bind(URL url, ChannelHandler listener)
+                           url:dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&channel.readonly.sent=true&codec=dubbo&dubbo=2.0.0&generic=false&heartbeat=60000&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461  listener:上边的DecodeHandler实例
+                          -->new NettyServer(URL url, ChannelHandler handler)
+                            -->ChannelHandler.wrapInternal(ChannelHandler handler, URL url)
+                               handler:上边的DecodeHandler实例
+                               url:dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&channel.readonly.sent=true&codec=dubbo&dubbo=2.0.0&generic=false&heartbeat=60000&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&threadname=DubboServerHandler-10.10.10.10:20880&timestamp=1510023456461
+                              -->new MultiMessageHandler(HeartbeatHandler(AllChannelHandler(handler)))
+                            -->getChannelCodec(url)//获取Codec2，这里是DubboCountCodec实例
+                            -->doOpen()//开启netty服务
+                      -->new HeaderExchangeServer(Server server)
+                         server:上述的NettyServer
+                        -->startHeatbeatTimer()
+            -->new ExporterChangeableWrapper(Exporter<T> exporter, Invoker<T> originInvoker)
+               exporter:上述的DubboExporter实例
+               originInvoker：原始的AbstractProxyInvoker实例
+          //2.4 创建Registry：创建zkclient，连接zk
+          -->getRegistry(final Invoker<?> originInvoker)
+            -->AbstractRegistryFactory.getRegistry(URL url)
+               url：zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&dubbo=2.0.0&export=dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461&pid=3508&timestamp=1510023439825
+              -->ZookeeperRegistryFactory.createRegistry(URL url)
+                -->new ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter)
+                   url:zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&dubbo=2.0.0&interface=com.alibaba.dubbo.registry.RegistryService&pid=3508&timestamp=1510023439825
+                  -->ZkclientZookeeperTransporter.connect(URL url)
+                    -->new ZkclientZookeeperClient(URL url)
+                       url：zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService?application=demo-provider&dubbo=2.0.0&interface=com.alibaba.dubbo.registry.RegistryService&pid=3508&timestamp=1510023439825
+                      -->new ZkClient(url.getBackupAddress())//这里是10.211.55.5:2181
+            -->AbstractRegistryFactory.Map<String, Registry> REGISTRIES.put("zookeeper://10.211.55.5:2181/com.alibaba.dubbo.registry.RegistryService", 上边的ZookeeperRegistry实例)
+          //2.5 向注册中心注册服务
+          -->registry.register(registedProviderUrl)
+            -->ZookeeperRegistry.doRegister(URL url)
+               url：dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461
+              -->AbstractZookeeperClient.create(String path, boolean ephemeral)
+                 path:/dubbo/com.alibaba.dubbo.demo.DemoService/providers/dubbo://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461
+                 ephemeral=true
+          //2.6 订阅override数据
+          -->ZookeeperRegistry.doSubscribe(final URL url, final NotifyListener listener)
+             url：provider://10.10.10.10:20880/com.alibaba.dubbo.demo.DemoService?anyhost=true&application=demo-provider&category=configurators&check=false&dubbo=2.0.0&generic=false&interface=com.alibaba.dubbo.demo.DemoService&methods=sayHello&pid=3508&side=provider&timestamp=1510023456461
+             listener：RegistryProtocol.OverrideListener实例
+          //2.7 创建新的Exporter实例
+          -->new Exporter<T>()//包含了上边的ExporterChangeableWrapper<T> exporter实例 + ZookeeperRegistry实例
