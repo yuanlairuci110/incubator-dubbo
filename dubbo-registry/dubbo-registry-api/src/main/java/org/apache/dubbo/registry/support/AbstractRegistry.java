@@ -282,6 +282,14 @@ public abstract class AbstractRegistry implements Registry {
         registered.remove(url);
     }
 
+    /**
+     * 首先从ConcurrentMap<URL, Set<NotifyListener>> subscribed中获取key为url的集合Set<NotifyListener>，
+     * 如果该集合存在，直接将当前的NotifyListener实例存入该集合，
+     * 如果集合不存在，先创建，之后放入subscribed中，并将当前的NotifyListener实例存入刚刚创建的集合
+     *
+     * @param url      Subscription condition, not allowed to be empty, e.g. consumer://10.20.153.10/org.apache.dubbo.foo.BarService?version=1.0.0&application=kylin
+     * @param listener A listener of the change event, not allowed to be empty
+     */
     @Override
     public void subscribe(URL url, NotifyListener listener) {
         if (url == null) {

@@ -160,6 +160,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
         }
     }
 
+    // 当前的provider订阅了/dubbo/com.alibaba.dubbo.demo.DemoService/configurators，当其下的子节点发生变化时，如果其下的子节点的url或者当前的providerUrl发生了变化，需要重新暴露。
     @Override
     public void doSubscribe(final URL url, final NotifyListener listener) {
         try {
@@ -195,7 +196,16 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     }
                 }
             } else {
+                /**
+                 * ConcurrentMap<URL, ConcurrentMap<NotifyListener, ChildListener>> zkListeners
+                 *
+                 * 1、根据url获取ConcurrentMap<NotifyListener, ChildListener>，没有就创建
+                 * 2、根据listener从ConcurrentMap<NotifyListener, ChildListener>获取ChildListener，没有就创建（创建的ChildListener用来监听子节点的变化）
+                 * 3、创建path持久化节点
+                 * 4、创建path子节点监听器
+                 */
                 List<URL> urls = new ArrayList<>();
+                // 首先获取categorypath：实际上就是获取/dubbo/{servicename}/{url中的category参数，默认是providers，这里是final URL overrideSubscribeUrl = getSubscribedOverrideUrl(registedProviderUrl);这句代码中添加到overrideSubscribeUrl上的category=configurators}
                 for (String path : toCategoriesPath(url)) {
                     ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
                     if (listeners == null) {
@@ -207,7 +217,9 @@ public class ZookeeperRegistry extends FailbackRegistry {
                         listeners.putIfAbsent(listener, (parentPath, currentChilds) -> ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath, currentChilds)));
                         zkListener = listeners.get(listener);
                     }
+                    // 创建持久化节点/dubbo/com.alibaba.dubbo.demo.DemoService/configurators
                     zkClient.create(path, false);
+                    // 然后使用AbstractZookeeperClient<TargetChildListener>的addChildListener(String path, final ChildListener listener)方法为path下的子节点添加上边创建出来的内部类ChildListener实例
                     List<String> children = zkClient.addChildListener(path, zkListener);
                     if (children != null) {
                         urls.addAll(toUrlsWithEmpty(url, path, children));

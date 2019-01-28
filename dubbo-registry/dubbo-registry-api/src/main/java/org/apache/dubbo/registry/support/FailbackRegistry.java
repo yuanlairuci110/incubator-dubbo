@@ -147,6 +147,16 @@ public abstract class FailbackRegistry extends AbstractRegistry {
         }
     }
 
+    /**
+     * 从失败集合移除overrideSubscribeListener实例
+     *
+     * 1、从ConcurrentMap<URL, Set<NotifyListener>> failedSubscribed 中获取当前url的订阅失败列表Set<NotifyListener>，之后从中删除掉该NotifyListener实例；
+     * 2、从ConcurrentMap<URL, Set<NotifyListener>> failedUnsubscribed 中获取当前url的反订阅失败列表Set<NotifyListener>，之后从中删除掉该NotifyListener实例；
+     * 3、从ConcurrentMap<URL, Map<NotifyListener, List<URL>>> failedNotified 中获取当前url的通知失败map Map<NotifyListener, List<URL>>，之后从中删除掉该NotifyListener实例以及其需要通知的所有的url。
+     *
+     * @param url
+     * @param listener
+     */
     private void removeFailedSubscribed(URL url, NotifyListener listener) {
         Holder h = new Holder(url, listener);
         FailedSubscribedTask f = failedSubscribed.remove(h);

@@ -215,6 +215,7 @@ public class RegistryProtocol implements Protocol {
         }
 
         // Deprecated! Subscribe to override rules in 2.6.x or before.
+        // org.apache.dubbo.registry.support.FailbackRegistry.subscribe
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
 
         exporter.setRegisterUrl(registeredProviderUrl);
