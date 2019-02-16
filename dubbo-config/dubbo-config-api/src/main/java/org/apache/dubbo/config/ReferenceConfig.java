@@ -249,6 +249,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         ref = null;
     }
 
+    /**
+     * org.apache.dubbo.config.spring.ReferenceBean#getObject()
+     * org.apache.dubbo.config.ReferenceConfig#get()
+     *
+     */
     private void init() {
         if (initialized) {
             return;
@@ -309,6 +314,15 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         ApplicationModel.initConsumerModel(getUniqueServiceName(), consumerModel);
     }
 
+    /**
+     * 核心代码：2步
+     *  (1)、refprotocol.refer(interfaceClass, urls.get(0))、 refprotocol.refer(interfaceClass, url)
+     *      使用Protocol将interfaceClass转化为Invoker
+     *  (2)、(T) proxyFactory.getProxy(invoker)
+     *      使用ProxyFactory创建代理
+     * @param map
+     * @return
+     */
     @SuppressWarnings({"unchecked", "rawtypes", "deprecation"})
     private T createProxy(Map<String, String> map) {
         URL tmpUrl = new URL("temp", "localhost", 0, map);

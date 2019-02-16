@@ -66,6 +66,34 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
         SpringExtensionFactory.addApplicationContext(applicationContext);
     }
 
+    /**
+     * 调用栈
+     *  getObject:65, ReferenceBean (com.alibaba.dubbo.config.spring)
+     *  doGetObjectFromFactoryBean:144, FactoryBeanRegistrySupport (org.springframework.beans.factory.support)
+     *  getObjectFromFactoryBean:103, FactoryBeanRegistrySupport (org.springframework.beans.factory.support)
+     *  getObjectForBeanInstance:1514, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  doGetBean:252, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  getBean:200, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  doGetBean:273, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  getBean:195, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  findAutowireCandidates:1017, DefaultListableBeanFactory (org.springframework.beans.factory.support)
+     *  doResolveDependency:960, DefaultListableBeanFactory (org.springframework.beans.factory.support)
+     *  resolveDependency:858, DefaultListableBeanFactory (org.springframework.beans.factory.support)
+     *  inject:480, AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement (org.springframework.beans.factory.annotation)
+     *  inject:87, InjectionMetadata (org.springframework.beans.factory.annotation)
+     *  postProcessPropertyValues:289, AutowiredAnnotationBeanPostProcessor (org.springframework.beans.factory.annotation)
+     *  populateBean:1185, AbstractAutowireCapableBeanFactory (org.springframework.beans.factory.support)
+     *  doCreateBean:537, AbstractAutowireCapableBeanFactory (org.springframework.beans.factory.support)
+     *  createBean:475, AbstractAutowireCapableBeanFactory (org.springframework.beans.factory.support)
+     *  getObject:304, AbstractBeanFactory$1 (org.springframework.beans.factory.support)
+     *  getSingleton:228, DefaultSingletonBeanRegistry (org.springframework.beans.factory.support)
+     *  doGetBean:300, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  getBean:195, AbstractBeanFactory (org.springframework.beans.factory.support)
+     *  preInstantiateSingletons:703, DefaultListableBeanFactory (org.springframework.beans.factory.support)
+     *  finishBeanFactoryInitialization:760, AbstractApplicationContext (org.springframework.context.support)
+     *  refresh:482, AbstractApplicationContext (org.springframework.context.support)
+     * @return
+     */
     @Override
     public Object getObject() {
         return get();
